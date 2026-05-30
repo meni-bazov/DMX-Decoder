@@ -1,0 +1,904 @@
+<!doctype html>
+<!-- הוספנו dark כברירת מחדל ב-HTML עצמו למניעת הבהוב לבן -->
+<html lang="he" dir="rtl" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>DMX Channel Decoder</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+      };
+    </script>
+
+    <!-- React & ReactDOM -->
+    <script
+      src="https://unpkg.com/react@18/umd/react.production.min.js"
+      crossorigin
+    ></script>
+    <script
+      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+      crossorigin
+    ></script>
+
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- DragDropTouch Polyfill (פותר את בעיית הגרירה באייפון ובמסכי מגע) -->
+    <script src="https://bernardo-castilho.github.io/DragDropTouch/DragDropTouch.js"></script>
+
+    <style>
+      /* Print Styles */
+      @media print {
+        .no-print {
+          display: none !important;
+        }
+        .print-only {
+          display: block !important;
+        }
+        body {
+          background-color: white !important;
+        }
+        .page-break-inside-avoid {
+          page-break-inside: avoid;
+        }
+      }
+      .print-only {
+        display: none;
+      }
+
+      /* Custom Drag Handle Cursor */
+      .drag-handle {
+        cursor: grab;
+        touch-action: none; /* מונע גלילת מסך כשגוררים באייפון */
+      }
+      .drag-handle:active {
+        cursor: grabbing;
+      }
+
+      /* Hide scrollbar for tabs and table containers but keep them scrollable */
+      .hide-scrollbar::-webkit-scrollbar {
+        height: 6px;
+      }
+      .hide-scrollbar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      .dark .hide-scrollbar::-webkit-scrollbar-thumb {
+        background: #475569;
+      }
+
+      /* מניעת זום אוטומטי באייפון כשלוחצים על תיבות טקסט */
+      input,
+      select {
+        font-size: 16px !important;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-900 text-gray-100 transition-colors duration-200">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect } = React;
+
+      // --- Inline SVG Icons ---
+      const SunIcon = ({ className }) => (
+        <svg
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+          ></path>
+        </svg>
+      );
+      const MoonIcon = ({ className }) => (
+        <svg
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+          ></path>
+        </svg>
+      );
+      const PlusIcon = ({ className }) => (
+        <svg
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M12 4v16m8-8H4"
+          ></path>
+        </svg>
+      );
+      const PrinterIcon = ({ className }) => (
+        <svg
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+          ></path>
+        </svg>
+      );
+      const TrashIcon = ({ className }) => (
+        <svg
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+          ></path>
+        </svg>
+      );
+      const CheckIcon = ({ className }) => (
+        <svg
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M5 13l4 4L19 7"
+          ></path>
+        </svg>
+      );
+      const GripIcon = ({ className }) => (
+        <svg
+          className={className}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M10 9a1 1 0 11-2 0 1 1 0 012 0zm0 6a1 1 0 11-2 0 1 1 0 012 0zm6-6a1 1 0 11-2 0 1 1 0 012 0zm0 6a1 1 0 11-2 0 1 1 0 012 0z"
+          ></path>
+        </svg>
+      );
+
+      // כל התכונות באותיות גדולות + FROST
+      const ATTRIBUTES = [
+        "PAN",
+        "TILT",
+        "P/T SPEED",
+        "DIMMER",
+        "SHUTTER",
+        "COLOR",
+        "RED",
+        "GREEN",
+        "BLUE",
+        "WHITE",
+        "CYAN",
+        "MAGENTA",
+        "YELLOW",
+        "GOBO",
+        "GOBO ROT",
+        "PRISM",
+        "PRISM ROT",
+        "ZOOM",
+        "FOCUS",
+        "IRIS",
+        "FROST",
+        "CONTROL",
+        "RESET",
+      ];
+
+      // פונקציות עזר לשליפה ושמירה ב-LocalStorage
+      const loadState = (key, defaultValue) => {
+        try {
+          const saved = localStorage.getItem(key);
+          if (saved !== null) {
+            return JSON.parse(saved);
+          }
+        } catch (e) {
+          console.error(`Error loading ${key} from localStorage`, e);
+        }
+        return defaultValue;
+      };
+
+      function App() {
+        // אתחול משתנים מה-LocalStorage או ברירת מחדל
+        const [darkMode, setDarkMode] = useState(() =>
+          loadState("dmx_darkMode", true),
+        );
+        const [fixtureName, setFixtureName] = useState(() =>
+          loadState("dmx_fixtureName", ""),
+        );
+        const [manufacturer, setManufacturer] = useState(() =>
+          loadState("dmx_manufacturer", ""),
+        );
+
+        const defaultModes = [
+          {
+            id: Date.now(),
+            name: "Mode 1",
+            channels: Array.from({ length: 12 }, (_, i) => ({
+              num: i + 1,
+              attribute: "",
+              hasFine: false,
+              isFineOf: null,
+              locate: "0",
+            })),
+          },
+        ];
+
+        const [modes, setModes] = useState(() =>
+          loadState("dmx_modes", defaultModes),
+        );
+        const [activeModeId, setActiveModeId] = useState(() => {
+          const savedModes = loadState("dmx_modes", defaultModes);
+          const savedActiveId = loadState("dmx_activeModeId", savedModes[0].id);
+          // נוודא שה-ID השמור באמת קיים ברשימה
+          return savedModes.some((m) => m.id === savedActiveId)
+            ? savedActiveId
+            : savedModes[0].id;
+        });
+
+        // Drag & Drop State
+        const [draggedIdx, setDraggedIdx] = useState(null);
+        const [dragOverIdx, setDragOverIdx] = useState(null);
+
+        // --- שמירה אוטומטית (Auto Save Effects) ---
+        useEffect(() => {
+          localStorage.setItem("dmx_fixtureName", JSON.stringify(fixtureName));
+        }, [fixtureName]);
+        useEffect(() => {
+          localStorage.setItem(
+            "dmx_manufacturer",
+            JSON.stringify(manufacturer),
+          );
+        }, [manufacturer]);
+        useEffect(() => {
+          localStorage.setItem("dmx_modes", JSON.stringify(modes));
+        }, [modes]);
+        useEffect(() => {
+          localStorage.setItem(
+            "dmx_activeModeId",
+            JSON.stringify(activeModeId),
+          );
+        }, [activeModeId]);
+        useEffect(() => {
+          localStorage.setItem("dmx_darkMode", JSON.stringify(darkMode));
+          // החלפת ה-classes ב-DOM
+          if (darkMode) {
+            document.documentElement.classList.add("dark");
+            document.body.classList.add("bg-gray-900", "text-gray-100");
+            document.body.classList.remove("bg-gray-50", "text-gray-900");
+          } else {
+            document.documentElement.classList.remove("dark");
+            document.body.classList.add("bg-gray-50", "text-gray-900");
+            document.body.classList.remove("bg-gray-900", "text-gray-100");
+          }
+        }, [darkMode]);
+
+        const handleGeneratePDF = () => window.print();
+
+        const addMode = () => {
+          const newMode = {
+            id: Date.now(),
+            name: `Mode ${modes.length + 1}`,
+            channels: Array.from({ length: 12 }, (_, i) => ({
+              num: i + 1,
+              attribute: "",
+              hasFine: false,
+              isFineOf: null,
+              locate: "0",
+            })),
+          };
+          setModes([...modes, newMode]);
+          setActiveModeId(newMode.id);
+        };
+
+        const removeMode = (modeId) => {
+          if (modes.length === 1) return;
+          const updatedModes = modes.filter((m) => m.id !== modeId);
+          setModes(updatedModes);
+          if (activeModeId === modeId) setActiveModeId(updatedModes[0].id);
+        };
+
+        const updateModeName = (modeId, newName) => {
+          setModes(
+            modes.map((m) => (m.id === modeId ? { ...m, name: newName } : m)),
+          );
+        };
+
+        const handleChannelCountChange = (modeId, newCount) => {
+          let count = parseInt(newCount, 10);
+          if (isNaN(count) || count < 1) count = 1;
+          if (count > 512) count = 512;
+
+          setModes(
+            modes.map((m) => {
+              if (m.id !== modeId) return m;
+              let newChannels = [...m.channels];
+
+              if (count > newChannels.length) {
+                for (let i = newChannels.length; i < count; i++) {
+                  newChannels.push({
+                    num: i + 1,
+                    attribute: "",
+                    hasFine: false,
+                    isFineOf: null,
+                    locate: "0",
+                  });
+                }
+              } else if (count < newChannels.length) {
+                newChannels = newChannels.slice(0, count);
+                if (
+                  newChannels.length > 0 &&
+                  newChannels[newChannels.length - 1].hasFine
+                ) {
+                  newChannels[newChannels.length - 1].hasFine = false;
+                }
+              }
+              return { ...m, channels: newChannels };
+            }),
+          );
+        };
+
+        const updateChannelAttr = (modeId, index, newAttr) => {
+          setModes(
+            modes.map((m) => {
+              if (m.id !== modeId) return m;
+              const newChannels = [...m.channels];
+              newChannels[index].attribute = newAttr;
+
+              if (
+                newChannels[index].hasFine &&
+                index + 1 < newChannels.length
+              ) {
+                newChannels[index + 1].attribute = newAttr
+                  ? `${newAttr} FINE`
+                  : "";
+              }
+              return { ...m, channels: newChannels };
+            }),
+          );
+        };
+
+        const toggleFine = (modeId, index) => {
+          setModes(
+            modes.map((m) => {
+              if (m.id !== modeId) return m;
+              const newChannels = [...m.channels];
+              const currentChannel = newChannels[index];
+
+              if (!currentChannel.hasFine) {
+                currentChannel.hasFine = true;
+                const fineAttr = currentChannel.attribute
+                  ? `${currentChannel.attribute} FINE`
+                  : "FINE";
+
+                if (index + 1 >= newChannels.length) {
+                  newChannels.push({
+                    num: newChannels.length + 1,
+                    attribute: fineAttr,
+                    hasFine: false,
+                    isFineOf: index,
+                    locate: "0",
+                  });
+                } else {
+                  newChannels[index + 1] = {
+                    ...newChannels[index + 1],
+                    attribute: fineAttr,
+                    isFineOf: index,
+                    hasFine: false,
+                  };
+                  if (
+                    newChannels.length > index + 2 &&
+                    newChannels[index + 2].isFineOf === index + 1
+                  ) {
+                    newChannels[index + 2].isFineOf = null;
+                    newChannels[index + 2].attribute = "";
+                  }
+                }
+              } else {
+                currentChannel.hasFine = false;
+                if (
+                  index + 1 < newChannels.length &&
+                  newChannels[index + 1].isFineOf === index
+                ) {
+                  newChannels[index + 1] = {
+                    ...newChannels[index + 1],
+                    attribute: "",
+                    isFineOf: null,
+                  };
+                }
+              }
+              return { ...m, channels: newChannels };
+            }),
+          );
+        };
+
+        const updateLocate = (modeId, index, val) => {
+          let numVal = parseInt(val, 10);
+          let strVal = val;
+          if (!isNaN(numVal)) {
+            if (numVal < 0) strVal = "0";
+            if (numVal > 255) strVal = "255";
+          }
+          setModes(
+            modes.map((m) => {
+              if (m.id !== modeId) return m;
+              const newChannels = [...m.channels];
+              newChannels[index].locate = strVal;
+              return { ...m, channels: newChannels };
+            }),
+          );
+        };
+
+        // --- Drag and Drop Logic ---
+        const handleDragStart = (e, idx) => {
+          const mode = modes.find((m) => m.id === activeModeId);
+          let dragIdx = idx;
+          if (mode.channels[idx].isFineOf !== null) {
+            dragIdx = mode.channels[idx].isFineOf;
+          }
+          setDraggedIdx(dragIdx);
+          e.dataTransfer.effectAllowed = "move";
+          setTimeout(() => {
+            if (e.target.closest("tr"))
+              e.target.closest("tr").classList.add("opacity-40");
+          }, 0);
+        };
+
+        const handleDragEnd = (e) => {
+          if (e.target.closest("tr"))
+            e.target.closest("tr").classList.remove("opacity-40");
+          setDraggedIdx(null);
+          setDragOverIdx(null);
+        };
+
+        const handleDragOver = (e, idx) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          if (idx !== dragOverIdx) {
+            setDragOverIdx(idx);
+          }
+        };
+
+        const handleDrop = (e, dropIdx) => {
+          e.preventDefault();
+          if (draggedIdx === null) return;
+          moveChannel(activeModeId, draggedIdx, dropIdx);
+          setDraggedIdx(null);
+          setDragOverIdx(null);
+        };
+
+        const moveChannel = (modeId, dragIdx, dropIdx) => {
+          setModes((prevModes) =>
+            prevModes.map((m) => {
+              if (m.id !== modeId) return m;
+
+              let newChannels = [...m.channels];
+              let actualDragIdx = dragIdx;
+              let actualDropIdx = dropIdx;
+
+              if (newChannels[actualDropIdx].isFineOf !== null) {
+                actualDropIdx = newChannels[actualDropIdx].isFineOf;
+              }
+
+              if (actualDragIdx === actualDropIdx) return m;
+
+              const isDraggingParent = newChannels[actualDragIdx].hasFine;
+              const dragCount = isDraggingParent ? 2 : 1;
+
+              const draggedItems = newChannels.splice(actualDragIdx, dragCount);
+
+              let insertIdx = actualDropIdx;
+              if (actualDragIdx < actualDropIdx) {
+                insertIdx -= dragCount;
+                const dropTargetHasFine =
+                  newChannels[insertIdx] && newChannels[insertIdx].hasFine;
+                const dropTargetCount = dropTargetHasFine ? 2 : 1;
+                insertIdx += dropTargetCount;
+              }
+
+              newChannels.splice(insertIdx, 0, ...draggedItems);
+
+              for (let i = 0; i < newChannels.length; i++) {
+                newChannels[i].num = i + 1;
+                newChannels[i].isFineOf = null;
+              }
+
+              for (let i = 0; i < newChannels.length; i++) {
+                if (newChannels[i].hasFine) {
+                  if (i + 1 < newChannels.length) {
+                    newChannels[i + 1].isFineOf = i;
+                    newChannels[i + 1].attribute = newChannels[i].attribute
+                      ? `${newChannels[i].attribute} FINE`
+                      : "FINE";
+                    newChannels[i + 1].hasFine = false;
+                  } else {
+                    newChannels[i].hasFine = false;
+                  }
+                }
+              }
+
+              return { ...m, channels: newChannels };
+            }),
+          );
+        };
+
+        const activeMode = modes.find((m) => m.id === activeModeId) || modes[0];
+
+        return (
+          <div className="min-h-screen font-sans">
+            {/* --- PRINT VIEW --- */}
+            <div
+              className="print-only w-full p-8 bg-white text-black"
+              dir="ltr"
+            >
+              <div className="border-b-2 border-gray-800 pb-4 mb-6">
+                <h1 className="text-3xl font-bold mb-2">DMX Fixture Map</h1>
+                <div className="grid grid-cols-2 gap-4 text-lg">
+                  <div>
+                    <span className="font-semibold text-gray-600">
+                      Fixture:
+                    </span>{" "}
+                    {fixtureName || "N/A"}
+                  </div>
+                  <div>
+                    <span className="font-semibold text-gray-600">
+                      Manufacturer:
+                    </span>{" "}
+                    {manufacturer || "N/A"}
+                  </div>
+                </div>
+              </div>
+
+              {modes.map((mode) => (
+                <div key={mode.id} className="mb-10 page-break-inside-avoid">
+                  <h2 className="text-2xl font-bold mb-4 text-blue-800 border-b pb-2">
+                    {mode.name}{" "}
+                    <span className="text-gray-500 text-lg font-normal">
+                      ({mode.channels.length} Channels)
+                    </span>
+                  </h2>
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100 border-b-2 border-gray-400">
+                        <th className="py-2 px-4 text-left font-bold w-16">
+                          CH
+                        </th>
+                        <th className="py-2 px-4 text-left font-bold">
+                          Attribute
+                        </th>
+                        <th className="py-2 px-4 text-center font-bold w-32">
+                          Locate
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mode.channels.map((ch) => (
+                        <tr
+                          key={ch.num}
+                          className="border-b border-gray-200 even:bg-gray-50"
+                        >
+                          <td className="py-2 px-4 font-mono font-semibold">
+                            {ch.num}
+                          </td>
+                          <td
+                            className={`py-2 px-4 ${ch.isFineOf !== null ? "text-gray-500 italic" : "font-medium"}`}
+                          >
+                            {ch.attribute || "-"}
+                          </td>
+                          <td className="py-2 px-4 text-center font-mono">
+                            {ch.locate || "0"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+
+            {/* --- INTERACTIVE APP --- */}
+            <div className="no-print max-w-6xl mx-auto p-2 sm:p-6 lg:p-8">
+              {/* Header */}
+              <div className="flex justify-between items-center mb-6 sm:mb-8 bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-3">
+                  <div className="bg-blue-600 p-2 rounded-lg">
+                    <CheckIcon className="text-white w-5 h-5 sm:w-6 sm:h-6" />
+                  </div>
+                  <h1 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
+                    DMX Channel Decoder
+                  </h1>
+                </div>
+                <button
+                  onClick={() => setDarkMode(!darkMode)}
+                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  title={darkMode ? "מצב בהיר" : "מצב כהה"}
+                >
+                  {darkMode ? (
+                    <SunIcon className="w-6 h-6 text-yellow-400" />
+                  ) : (
+                    <MoonIcon className="w-6 h-6 text-gray-600" />
+                  )}
+                </button>
+              </div>
+
+              {/* General Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+                <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    שם פנס (Fixture Name)
+                  </label>
+                  <input
+                    type="text"
+                    value={fixtureName}
+                    onChange={(e) => setFixtureName(e.target.value)}
+                    placeholder="לדוגמה: Mac Aura"
+                    className="w-full p-2.5 sm:p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                  />
+                </div>
+                <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    יצרן (Manufacturer)
+                  </label>
+                  <input
+                    type="text"
+                    value={manufacturer}
+                    onChange={(e) => setManufacturer(e.target.value)}
+                    placeholder="לדוגמה: Martin"
+                    className="w-full p-2.5 sm:p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Modes Management */}
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-8">
+                {/* Tabs */}
+                <div className="hide-scrollbar flex overflow-x-auto bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-2 gap-2">
+                  {modes.map((mode) => (
+                    <button
+                      key={mode.id}
+                      onClick={() => setActiveModeId(mode.id)}
+                      className={`flex-shrink-0 px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl font-medium transition-all ${
+                        activeModeId === mode.id
+                          ? "bg-white dark:bg-gray-800 shadow-sm text-blue-600 dark:text-blue-400"
+                          : "text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800"
+                      }`}
+                    >
+                      {mode.name}
+                    </button>
+                  ))}
+                  <button
+                    onClick={addMode}
+                    className="flex-shrink-0 flex items-center gap-1 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-800 transition-colors border border-dashed border-blue-300 dark:border-blue-800"
+                  >
+                    <PlusIcon className="w-4 h-4" /> הוסף מצב
+                  </button>
+                </div>
+
+                {/* Active Mode Settings */}
+                <div className="p-3 sm:p-6">
+                  <div className="flex flex-wrap items-end gap-4 sm:gap-6 mb-6">
+                    <div className="flex-1 min-w-[150px]">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 sm:mb-2">
+                        שם המצב (Mode Name)
+                      </label>
+                      <input
+                        type="text"
+                        value={activeMode.name}
+                        onChange={(e) =>
+                          updateModeName(activeMode.id, e.target.value)
+                        }
+                        className="w-full p-2 sm:p-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <div className="w-24 sm:w-32">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 sm:mb-2">
+                        מס' ערוצים
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="512"
+                        value={activeMode.channels.length}
+                        onChange={(e) =>
+                          handleChannelCountChange(
+                            activeMode.id,
+                            e.target.value,
+                          )
+                        }
+                        className="w-full p-2 sm:p-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none text-center"
+                      />
+                    </div>
+                    {modes.length > 1 && (
+                      <button
+                        onClick={() => removeMode(activeMode.id)}
+                        className="p-2 sm:p-3 bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 rounded-xl transition-colors"
+                        title="מחק מצב זה"
+                      >
+                        <TrashIcon className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Channels Table with Drag & Drop - Mobile Optimized Container */}
+                  <div className="hide-scrollbar overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 pb-2">
+                    <table
+                      className="w-full text-right select-none min-w-[450px] sm:min-w-full"
+                      dir="ltr"
+                    >
+                      <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 text-xs sm:text-sm">
+                        <tr>
+                          <th className="p-2 sm:p-4 w-10 sm:w-12 text-center border-b border-gray-200 dark:border-gray-700"></th>
+                          <th className="p-2 sm:p-4 w-12 sm:w-16 text-center border-b border-gray-200 dark:border-gray-700">
+                            CH
+                          </th>
+                          <th className="p-2 sm:p-4 text-left border-b border-gray-200 dark:border-gray-700 min-w-[140px]">
+                            Attribute
+                          </th>
+                          <th className="p-2 sm:p-4 w-16 sm:w-24 text-center border-b border-gray-200 dark:border-gray-700">
+                            Fine
+                          </th>
+                          <th className="p-2 sm:p-4 w-24 sm:w-32 text-center border-b border-gray-200 dark:border-gray-700">
+                            Locate
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700 text-sm sm:text-base">
+                        {activeMode.channels.map((ch, idx) => {
+                          const isFineChannel = ch.isFineOf !== null;
+                          const isBeingDraggedOver = dragOverIdx === idx;
+                          const hasFineChild = ch.hasFine;
+
+                          return (
+                            <tr
+                              key={ch.num}
+                              draggable={!isFineChannel}
+                              onDragStart={(e) => handleDragStart(e, idx)}
+                              onDragEnd={handleDragEnd}
+                              onDragOver={(e) => handleDragOver(e, idx)}
+                              onDrop={(e) => handleDrop(e, idx)}
+                              className={`
+                              transition-colors 
+                              ${isFineChannel ? "bg-gray-50/80 dark:bg-gray-800/40 border-t-0" : "bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50"}
+                              ${hasFineChild ? "border-b-0" : ""}
+                              ${isBeingDraggedOver ? "border-t-2 border-blue-500 bg-blue-50 dark:bg-blue-900/20" : ""}
+                            `}
+                            >
+                              {/* Drag Handle */}
+                              <td className="p-2 sm:p-3 text-center text-gray-400">
+                                {!isFineChannel && (
+                                  <GripIcon className="w-6 h-6 sm:w-5 sm:h-5 mx-auto drag-handle hover:text-gray-600 dark:hover:text-gray-200 active:text-blue-500" />
+                                )}
+                                {isFineChannel && (
+                                  <div className="w-1 h-full bg-gray-300 dark:bg-gray-600 mx-auto rounded-full"></div>
+                                )}
+                              </td>
+
+                              <td className="p-2 sm:p-3 text-center font-mono font-medium text-gray-900 dark:text-gray-100">
+                                {ch.num}
+                              </td>
+
+                              <td className="p-2 sm:p-3">
+                                <select
+                                  disabled={isFineChannel}
+                                  value={ch.attribute}
+                                  onChange={(e) =>
+                                    updateChannelAttr(
+                                      activeMode.id,
+                                      idx,
+                                      e.target.value,
+                                    )
+                                  }
+                                  className={`w-full p-2 sm:p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none ${isFineChannel ? "cursor-not-allowed bg-gray-100 dark:bg-gray-900 text-gray-500 font-medium" : ""}`}
+                                >
+                                  <option value="">
+                                    -- Select Attribute --
+                                  </option>
+                                  {ATTRIBUTES.map((attr) => (
+                                    <option key={attr} value={attr}>
+                                      {attr}
+                                    </option>
+                                  ))}
+                                  {isFineChannel && (
+                                    <option
+                                      value={ch.attribute}
+                                      className="hidden"
+                                    >
+                                      {ch.attribute}
+                                    </option>
+                                  )}
+                                </select>
+                              </td>
+
+                              <td className="p-2 sm:p-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  disabled={isFineChannel}
+                                  checked={ch.hasFine}
+                                  onChange={() =>
+                                    toggleFine(activeMode.id, idx)
+                                  }
+                                  className="w-5 h-5 sm:w-5 sm:h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                              </td>
+
+                              <td className="p-2 sm:p-3">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="255"
+                                  value={ch.locate}
+                                  onChange={(e) =>
+                                    updateLocate(
+                                      activeMode.id,
+                                      idx,
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="w-full p-2 sm:p-2.5 text-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              {/* Generate Button */}
+              <div className="flex justify-end pb-8 sm:pb-12">
+                <button
+                  onClick={handleGeneratePDF}
+                  className="flex items-center gap-2 px-6 py-3 sm:px-8 sm:py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 w-full sm:w-auto justify-center"
+                >
+                  <PrinterIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                  צור קובץ (Generate PDF)
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(<App />);
+    </script>
+  </body>
+</html>
